@@ -43,9 +43,11 @@ export default function PostCreate() {
     prep_time: toLocalInput(now), handoff: "pickup", dropoff_name: "",
     window_start: toLocalInput(now), window_end: toLocalInput(new Date(now.getTime() + 4 * 3600000)),
     privacy_offset: true, responsibility_ack: false,
+    weight_mode: "auto", weight_kg: "", auto_accept: false,
   });
 
   const maxH = f.category === "cooked" ? 6 : 48;
+  const estKg = (f.category === "cooked" ? 0.4 : 1.0) * Math.max(1, Number(f.portions) || 1);
 
   const compressAndUpload = async (file) => {
     setBusy(true);
@@ -79,6 +81,8 @@ export default function PostCreate() {
         window_end: new Date(f.window_end).toISOString(),
         lat: pos.lat, lng: pos.lng, privacy_offset: f.privacy_offset,
         responsibility_ack: f.responsibility_ack,
+        weight_kg: f.weight_mode === "manual" && Number(f.weight_kg) > 0 ? Number(f.weight_kg) : null,
+        auto_accept: f.auto_accept,
       };
       const { data } = await api.post("/posts", payload);
       toast.success("Mantap! Makananmu sudah tayang.");
@@ -151,6 +155,27 @@ export default function PostCreate() {
             </div>
           </div>
           <div>
+            <p className={labelCls}>Perkiraan berat</p>
+            <div className="mt-1.5 flex gap-2">
+              <button data-testid="weight-mode-auto" onClick={() => setF({ ...f, weight_mode: "auto" })}
+                className={`press flex-1 rounded-full py-2.5 text-xs font-extrabold ${f.weight_mode === "auto" ? "bg-forest text-white" : "bg-white text-slate2 border border-line"}`}>
+                Otomatis (±{estKg} kg)
+              </button>
+              <button data-testid="weight-mode-manual" onClick={() => setF({ ...f, weight_mode: "manual" })}
+                className={`press flex-1 rounded-full py-2.5 text-xs font-extrabold ${f.weight_mode === "manual" ? "bg-forest text-white" : "bg-white text-slate2 border border-line"}`}>
+                Koreksi manual
+              </button>
+            </div>
+            {f.weight_mode === "manual" && (
+              <input data-testid="weight-input" type="number" min={0.1} step={0.1} className={`${inputCls} mt-2`}
+                value={f.weight_kg} onChange={(e) => setF({ ...f, weight_kg: e.target.value })}
+                placeholder={`Berat total dalam kg (mis. ${estKg})`} />
+            )}
+            <p className="mt-1.5 text-xs text-slate2">
+              Berat dipakai buat menghitung total makanan yang diselamatkan komunitas.
+            </p>
+          </div>
+          <div>
             <p className={labelCls}>Catatan kondisi</p>
             <textarea data-testid="notes-input" rows={3} className={`${inputCls} mt-1.5 resize-none`} value={f.notes}
               onChange={(e) => setF({ ...f, notes: e.target.value })}
@@ -214,6 +239,13 @@ export default function PostCreate() {
                 onChange={(e) => setF({ ...f, privacy_offset: e.target.checked })} className="h-5 w-5 accent-clay" />
               <span className="text-xs font-semibold text-ink">Sembunyikan lokasi persis (digeser acak ~100 m)</span>
             </label>
+            <label className="press mt-2 flex items-start gap-3 rounded-2xl border border-line bg-white p-3">
+              <input data-testid="auto-accept-checkbox" type="checkbox" checked={f.auto_accept}
+                onChange={(e) => setF({ ...f, auto_accept: e.target.checked })} className="mt-0.5 h-5 w-5 accent-clay" />
+              <span className="text-xs font-semibold leading-snug text-ink">
+                Terima klaim otomatis — penerima langsung dapat konfirmasi tanpa nunggu kamu.
+              </span>
+            </label>
           </div>
         </div>
       ),
@@ -226,8 +258,9 @@ export default function PostCreate() {
             {photo && <img src={mediaUrl(photo)} alt="preview" className="h-40 w-full object-cover" />}
             <div className="space-y-1 p-4">
               <p className="font-heading text-lg font-extrabold text-ink">{f.title}</p>
-              <p className="text-sm text-slate2">{f.portions} {f.category === "cooked" ? "porsi" : "paket"} · {f.category === "cooked" ? "matang" : "bahan mentah"}</p>
+              <p className="text-sm text-slate2">{f.portions} {f.category === "cooked" ? "porsi" : "paket"} · ±{f.weight_mode === "manual" && Number(f.weight_kg) > 0 ? Number(f.weight_kg) : estKg.toFixed(1)} kg · {f.category === "cooked" ? "matang" : "bahan mentah"}</p>
               <p className="text-sm text-slate2">{f.notes || "Tanpa catatan"}</p>
+              {f.auto_accept && <p className="text-xs font-extrabold uppercase tracking-widest text-forest">Terima otomatis aktif</p>}
             </div>
           </div>
           <label className="flex items-start gap-3 rounded-2xl border-2 border-clay/40 bg-white p-4">
@@ -249,7 +282,7 @@ export default function PostCreate() {
 
   return (
     <div className="min-h-screen w-full bg-[#EDE7E0]">
-      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand px-5 pb-10 pt-6 shadow-2xl" data-testid="post-create-page">
+      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand px-5 pb-10 pt-6 shadow-2xl md:my-8 md:min-h-0 md:max-w-2xl md:rounded-[2rem] md:px-8 md:py-8" data-testid="post-create-page">
         <div className="flex items-center justify-between">
           <button data-testid="post-back-btn" onClick={() => (step === 0 ? navigate("/feed") : setStep(step - 1))} className="press flex items-center gap-1 text-sm font-bold text-slate2">
             <ArrowLeft size={16} weight="bold" /> {step === 0 ? "Batal" : "Kembali"}

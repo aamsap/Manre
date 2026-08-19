@@ -36,7 +36,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen w-full bg-[#EDE7E0]">
-      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand px-6 pb-12 pt-8 shadow-2xl" data-testid="login-page">
+      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand px-6 pb-12 pt-8 shadow-2xl md:my-10 md:min-h-0 md:max-w-md md:rounded-[2rem] md:py-10" data-testid="login-page">
         <button data-testid="back-btn" onClick={() => navigate("/")} className="press mb-6 flex items-center gap-1 text-sm font-bold text-slate2">
           <ArrowLeft size={16} weight="bold" /> Kembali
         </button>

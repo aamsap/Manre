@@ -1,4 +1,4 @@
-const CACHE = "manre-shell-v1";
+const CACHE = "manre-shell-v2";
 const SHELL = ["/", "/manifest.json"];
 
 self.addEventListener("install", (e) => {
@@ -27,5 +27,34 @@ self.addEventListener("fetch", (e) => {
         return res;
       })
       .catch(() => caches.match(req).then((m) => m || caches.match("/")))
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let data = { title: "Manre", body: "Ada kabar baru di Manre.", url: "/inbox", tag: "manre" };
+  if (event.data) {
+    try { data = { ...data, ...event.data.json() }; }
+    catch (_) { data.body = event.data.text(); }
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      tag: data.tag,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: data.url },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      const existing = list.find((c) => c.url.startsWith(self.location.origin));
+      if (existing) return existing.navigate(target).then(() => existing.focus());
+      return self.clients.openWindow(target);
+    })
   );
 });

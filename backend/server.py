@@ -13,7 +13,7 @@ from starlette.middleware.cors import CORSMiddleware
 import requests
 
 from core import (db, hash_password, verify_password, create_jwt, get_current_user, get_admin_user,
-                  init_storage, put_object, get_object, notify, now_utc, iso, parse_dt,
+                  init_storage, put_object, get_object, notify, push_to_user, now_utc, iso, parse_dt,
                   PILOT_CENTER, PILOT_RADIUS_M, APP_NAME, logger)
 
 app = FastAPI(title="Manre API")
@@ -24,6 +24,54 @@ COOKED_MAX_H = 6
 RAW_MAX_H = 48
 CLAIM_LOCK_MIN = 15
 MAX_ACTIVE_CLAIMS = 2
+KG_PER_UNIT = {"cooked": 0.4, "raw": 1.0}
+
+
+def estimate_kg(category: str, portions: int) -> float:
+    return round(KG_PER_UNIT.get(category, 0.4) * max(1, portions), 2)
+
+
+def week_key(dt) -> str:
+    y, w, _ = dt.isocalendar()
+    return f"{y}-W{w:02d}"
+
+
+def prev_week_key(dt) -> str:
+    return week_key(dt - timedelta(days=7))
+
+
+async def bump_post_streak(user: dict):
+    today = now_utc().date().isoformat()
+    yesterday = (now_utc().date() - timedelta(days=1)).isoformat()
+    last = user.get("post_streak_last")
+    if last == today:
+        return
+    streak = (user.get("post_streak_days", 0) + 1) if last == yesterday else 1
+    best = max(streak, user.get("best_post_streak", 0))
+    await db.users.update_one({"user_id": user["user_id"]}, {"$set": {
+        "post_streak_days": streak, "post_streak_last": today, "best_post_streak": best,
+    }})
+    if streak in (3, 7, 14, 30):
+        await notify(user["user_id"], "streak", f"Streak posting {streak} hari!",
+                     "Keren, kamu konsisten bagi makanan. Jangan sampai putus ya!", "/profile")
+
+
+async def bump_handoff_streak(user_id: str):
+    u = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not u:
+        return
+    now = now_utc()
+    this_wk, last_wk = week_key(now), prev_week_key(now)
+    if u.get("handoff_streak_week") == this_wk:
+        return
+    streak = (u.get("handoff_streak_weeks", 0) + 1) if u.get("handoff_streak_week") == last_wk else 1
+    best = max(streak, u.get("best_handoff_streak", 0))
+    await db.users.update_one({"user_id": user_id}, {"$set": {
+        "handoff_streak_weeks": streak, "handoff_streak_week": this_wk, "best_handoff_streak": best,
+    }})
+    if streak in (2, 4, 8, 12):
+        await notify(user_id, "streak", f"Streak {streak} minggu berturut-turut!",
+                     "Kamu aktif berbagi tiap minggu. Terus jaga ya!", "/profile")
 
 
 # ---------- helpers ----------
@@ -37,7 +85,7 @@ def haversine_m(lat1, lng1, lat2, lng2):
 
 
 def in_pilot_zone(lat, lng):
-    return haversine_m(lat, lng, PILOT_CENTER["lat"], PILOT_CENTER["lng"]) <= PILOT_RADIUS_M
+    return True
 
 
 
@@ -55,6 +103,9 @@ def public_user(u: dict):
         "trust_score": u.get("trust_score", 50), "thumbs_up": u.get("thumbs_up", 0),
         "thumbs_down": u.get("thumbs_down", 0), "role": u.get("role", "user"),
         "handoffs": u.get("handoffs", 0),
+        "post_streak_days": u.get("post_streak_days", 0),
+        "handoff_streak_weeks": u.get("handoff_streak_weeks", 0),
+        "kg_shared": round(u.get("kg_shared", 0) or 0, 1),
     }
 
 
@@ -102,6 +153,16 @@ class PostIn(BaseModel):
     lng: float
     privacy_offset: bool = True
     responsibility_ack: bool
+    weight_kg: Optional[float] = None
+    auto_accept: bool = False
+
+
+class PushSubIn(BaseModel):
+    subscription: dict
+
+
+class PushUnsubIn(BaseModel):
+    endpoint: str
 
 
 class ClaimIn(BaseModel):
@@ -211,13 +272,11 @@ async def logout(request: Request, response: Response):
 
 @api.post("/me/location")
 async def set_location(payload: LocationIn, user: dict = Depends(get_current_user)):
-    inside = in_pilot_zone(payload.lat, payload.lng)
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {
         "location": {"type": "Point", "coordinates": [payload.lng, payload.lat]},
-        "zone_verified": inside,
+        "location_set": True,
     }})
-    dist = haversine_m(payload.lat, payload.lng, PILOT_CENTER["lat"], PILOT_CENTER["lng"])
-    return {"zone_verified": inside, "distance_m": round(dist)}
+    return {"location_set": True, "lat": payload.lat, "lng": payload.lng}
 
 
 @api.post("/me/onboarded")
@@ -273,8 +332,6 @@ async def create_post(payload: PostIn, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Kategori tidak valid")
     if payload.handoff not in ("pickup", "dropoff", "delivery"):
         raise HTTPException(status_code=400, detail="Mode serah terima tidak valid")
-    if not in_pilot_zone(payload.lat, payload.lng):
-        raise HTTPException(status_code=400, detail="Lokasi di luar zona pilot (UB Malang, radius 3 km)")
     start, end = parse_dt(payload.window_start), parse_dt(payload.window_end)
     if end <= start:
         raise HTTPException(status_code=400, detail="Jam akhir harus setelah jam mulai")
@@ -298,11 +355,15 @@ async def create_post(payload: PostIn, user: dict = Depends(get_current_user)):
         "window_start": iso(start), "window_end": iso(end),
         "location": {"type": "Point", "coordinates": [lng, lat]},
         "privacy_offset": payload.privacy_offset,
+        "weight_kg": round(payload.weight_kg, 2) if payload.weight_kg else estimate_kg(payload.category, payload.portions),
+        "weight_estimated": payload.weight_kg is None,
+        "auto_accept": payload.auto_accept,
         "status": "available", "flagged_review": flagged, "review_status": "pending" if flagged else "approved",
         "claims_count": 0, "created_at": iso(now_utc()),
     }
     await db.posts.insert_one(doc)
     await db.users.update_one({"user_id": user["user_id"]}, {"$inc": {"posts_count": 1}})
+    await bump_post_streak(user)
     doc.pop("_id", None)
     return await enrich_post(doc, user)
 
@@ -317,14 +378,12 @@ async def enrich_post(p: dict, viewer: dict = None, origin=None):
     if origin is None and viewer and viewer.get("location"):
         vc = viewer["location"]["coordinates"]
         origin = (vc[1], vc[0])
-    if origin is None:
-        origin = (PILOT_CENTER["lat"], PILOT_CENTER["lng"])
-    out["distance_m"] = round(haversine_m(origin[0], origin[1], coords[1], coords[0]))
+    out["distance_m"] = round(haversine_m(origin[0], origin[1], coords[1], coords[0])) if origin else None
     return out
 
 
 @api.get("/posts")
-async def list_posts(category: Optional[str] = None, radius_km: Optional[float] = MAX_RADIUS_KM,
+async def list_posts(category: Optional[str] = None, radius_km: Optional[float] = None,
                      handoff: Optional[str] = None, mine: bool = False,
                      lat: Optional[float] = None, lng: Optional[float] = None,
                      user: dict = Depends(get_current_user)):
@@ -340,17 +399,17 @@ async def list_posts(category: Optional[str] = None, radius_km: Optional[float] 
         q["handoff"] = handoff
 
     origin = (lat, lng) if lat is not None and lng is not None else None
-    radius_km = min(radius_km or MAX_RADIUS_KM, MAX_RADIUS_KM)
     docs = await db.posts.find(q, {"_id": 0}).sort("created_at", -1).to_list(300)
     out = []
     for d in docs:
         e = await enrich_post(d, user, origin)
-        if not mine and e["distance_m"] > radius_km * 1000:
+        if not mine and radius_km and e["distance_m"] is not None and e["distance_m"] > radius_km * 1000:
             continue
         out.append(e)
     if mine:
         return out
-    out.sort(key=lambda x: (parse_dt(x["window_end"]), x["distance_m"]))
+    out.sort(key=lambda x: (parse_dt(x["window_end"]),
+                            x["distance_m"] if x["distance_m"] is not None else 1e12))
     return out
 
 
@@ -402,19 +461,31 @@ async def claim_post(post_id: str, payload: ClaimIn, user: dict = Depends(get_cu
         raise HTTPException(status_code=400, detail=f"Maksimal {MAX_ACTIVE_CLAIMS} klaim aktif sekaligus")
 
     cid = str(uuid.uuid4())
+    auto = bool(p.get("auto_accept"))
     doc = {
         "id": cid, "post_id": post_id, "post_title": p["title"], "post_photo": p["photo_url"],
-        "donor_id": p["donor_id"], "recipient_id": user["user_id"], "status": "pending",
+        "donor_id": p["donor_id"], "recipient_id": user["user_id"],
+        "status": "accepted" if auto else "pending",
+        "auto_accepted": auto,
         "note": payload.note, "recipient_ack": True,
         "lock_expires_at": iso(now_utc() + timedelta(minutes=CLAIM_LOCK_MIN)),
         "donor_done": False, "recipient_done": False,
         "created_at": iso(now_utc()),
     }
+    if auto:
+        doc["accepted_at"] = iso(now_utc())
     await db.claims.insert_one(doc)
     await db.posts.update_one({"id": post_id}, {"$set": {"status": "claimed"}, "$inc": {"claims_count": 1}})
-    await notify(p["donor_id"], "claim", "Ada yang klaim makananmu!",
-                 f"{user['name']} mau ambil \"{p['title']}\". Konfirmasi dalam {CLAIM_LOCK_MIN} menit.",
-                 f"/chat/{cid}")
+    if auto:
+        await notify(p["donor_id"], "claim", "Klaim otomatis diterima",
+                     f"{user['name']} mengambil \"{p['title']}\". Atur waktu di chat ya.", f"/chat/{cid}")
+        await notify(user["user_id"], "accepted", "Klaim langsung diterima!",
+                     f"Donor mengaktifkan terima otomatis untuk \"{p['title']}\". Yuk atur waktu ambil.",
+                     f"/chat/{cid}")
+    else:
+        await notify(p["donor_id"], "claim", "Ada yang klaim makananmu!",
+                     f"{user['name']} mau ambil \"{p['title']}\". Konfirmasi dalam {CLAIM_LOCK_MIN} menit.",
+                     f"/chat/{cid}")
     doc.pop("_id", None)
     return doc
 
@@ -529,9 +600,12 @@ async def mark_done(claim_id: str, user: dict = Depends(get_current_user)):
         await db.posts.update_one({"id": c["post_id"]}, {"$set": {"status": "completed"}})
         post = await db.posts.find_one({"id": c["post_id"]}, {"_id": 0})
         portions = post.get("portions", 1) if post else 1
+        kg = post.get("weight_kg") or estimate_kg(post.get("category", "cooked"), portions) if post else 0
         for uid in (c["donor_id"], c["recipient_id"]):
             await db.users.update_one({"user_id": uid}, {"$inc": {"handoffs": 1}})
-        await db.users.update_one({"user_id": c["donor_id"]}, {"$inc": {"portions_shared": portions}})
+            await bump_handoff_streak(uid)
+        await db.users.update_one({"user_id": c["donor_id"]},
+                                  {"$inc": {"portions_shared": portions, "kg_shared": kg}})
         for uid, other in ((c["donor_id"], "penerima"), (c["recipient_id"], "donor")):
             await notify(uid, "completed", "Serah terima selesai!",
                          f"Yuk kasih rating buat {other} di \"{c['post_title']}\".", f"/chat/{claim_id}")
@@ -665,11 +739,49 @@ async def impact():
     completed = await db.claims.count_documents({"status": "completed"})
     posts = await db.posts.count_documents({})
     users = await db.users.count_documents({})
-    agg = await db.users.aggregate([{"$group": {"_id": None, "t": {"$sum": "$portions_shared"}}}]).to_list(1)
-    portions = (agg[0]["t"] if agg else 0) or 0
-    return {"portions_saved": portions, "target_portions": 1000, "handoffs": completed,
-            "posts": posts, "members": users,
-            "zone": {"name": "UB / Brawijaya, Malang", **PILOT_CENTER, "radius_m": PILOT_RADIUS_M}}
+    agg = await db.users.aggregate([{"$group": {"_id": None,
+                                                "p": {"$sum": "$portions_shared"},
+                                                "k": {"$sum": "$kg_shared"}}}]).to_list(1)
+    portions = (agg[0]["p"] if agg else 0) or 0
+    kg = round((agg[0]["k"] if agg else 0) or 0, 1)
+    return {"kg_saved": kg, "target_kg": 500,
+            "portions_saved": portions, "target_portions": 1000,
+            "handoffs": completed, "posts": posts, "members": users}
+
+
+@api.get("/push/public-key")
+async def push_public_key():
+    return {"publicKey": os.environ["VAPID_PUBLIC_KEY"]}
+
+
+@api.post("/push/subscribe", status_code=201)
+async def push_subscribe(payload: PushSubIn, user: dict = Depends(get_current_user)):
+    sub = payload.subscription
+    endpoint, keys = sub.get("endpoint"), sub.get("keys")
+    if not endpoint or not keys:
+        raise HTTPException(status_code=400, detail="Langganan push tidak valid")
+    await db.push_subscriptions.update_one(
+        {"user_id": user["user_id"], "endpoint": endpoint},
+        {"$set": {"user_id": user["user_id"], "endpoint": endpoint, "keys": keys,
+                  "created_at": iso(now_utc())}},
+        upsert=True)
+    return {"ok": True}
+
+
+@api.delete("/push/subscribe")
+async def push_unsubscribe(payload: PushUnsubIn, user: dict = Depends(get_current_user)):
+    await db.push_subscriptions.delete_one({"user_id": user["user_id"], "endpoint": payload.endpoint})
+    return {"ok": True}
+
+
+@api.post("/push/test")
+async def push_test(user: dict = Depends(get_current_user)):
+    count = await db.push_subscriptions.count_documents({"user_id": user["user_id"]})
+    if count == 0:
+        raise HTTPException(status_code=400, detail="Belum ada perangkat yang berlangganan")
+    await push_to_user(user["user_id"], "Notifikasi Manre aktif",
+                       "Mantap! Kamu akan dapat kabar klaim & pesan di sini.", "/inbox", "test")
+    return {"ok": True, "devices": count}
 
 
 # ---------- admin ----------
@@ -805,16 +917,20 @@ async def seed():
                 "location": {"type": "Point", "coordinates": [PILOT_CENTER["lng"] + off[1],
                                                               PILOT_CENTER["lat"] + off[0]]},
                 "privacy_offset": True, "status": "available", "flagged_review": False,
+                "weight_kg": estimate_kg(cat, portions), "weight_estimated": True,
+                "auto_accept": handoff == "dropoff",
                 "review_status": "approved", "claims_count": 0, "seeded": True,
                 "created_at": iso(n),
             })
     else:
         n = now_utc()
-        async for p in db.posts.find({"seeded": True}, {"_id": 0, "id": 1, "category": 1}):
+        async for p in db.posts.find({"seeded": True}, {"_id": 0, "id": 1, "category": 1, "portions": 1}):
             hours = 5 if p["category"] == "cooked" else 36
             await db.posts.update_one({"id": p["id"]}, {"$set": {
                 "window_start": iso(n), "window_end": iso(n + timedelta(hours=hours)),
                 "best_before": iso(n + timedelta(hours=hours)),
+                "weight_kg": estimate_kg(p["category"], p.get("portions", 1)),
+                "weight_estimated": True,
                 "prep_time": iso(n - timedelta(hours=1)) if p["category"] == "cooked" else None,
             }})
         await db.posts.update_many({"seeded": True, "status": {"$ne": "available"}},
@@ -842,6 +958,7 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.user_sessions.create_index("session_token")
     await db.messages.create_index([("claim_id", 1), ("created_at", 1)])
+    await db.push_subscriptions.create_index([("user_id", 1), ("endpoint", 1)], unique=True)
     try:
         init_storage()
         logger.info("Storage initialized")

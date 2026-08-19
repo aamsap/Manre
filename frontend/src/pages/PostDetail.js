@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { ArrowLeft, Package, Clock, MapPin, Truck, Handshake, Flag, Trash, ChatCircleDots } from "@phosphor-icons/react";
+import { ArrowLeft, Package, Clock, MapPin, Truck, Handshake, Flag, Trash, ChatCircleDots, Scales } from "@phosphor-icons/react";
 import { Countdown } from "@/components/Countdown";
 import { MiniMap } from "@/components/MiniMap";
 import { api, errMsg, mediaUrl } from "@/lib/api";
@@ -43,7 +43,9 @@ export default function PostDetail() {
     setBusy(true);
     try {
       const { data } = await api.post(`/posts/${id}/claim`, { recipient_ack: true, note: "" });
-      toast.success("Slot terkunci 15 menit. Tunggu donor konfirmasi!");
+      toast.success(data.auto_accepted
+        ? "Klaim langsung diterima! Yuk atur waktu ambil."
+        : "Slot terkunci 15 menit. Tunggu donor konfirmasi!");
       navigate(`/chat/${data.id}`);
     } catch (e) { toast.error(errMsg(e)); }
     setBusy(false);
@@ -67,8 +69,8 @@ export default function PostDetail() {
 
   return (
     <div className="min-h-screen w-full bg-[#EDE7E0]">
-      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand pb-40 shadow-2xl" data-testid="post-detail-page">
-        <div className="relative h-72">
+      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand pb-40 shadow-2xl md:my-8 md:min-h-0 md:max-w-3xl md:overflow-hidden md:rounded-[2rem] md:pb-8" data-testid="post-detail-page">
+        <div className="relative h-72 md:h-80">
           <img src={mediaUrl(post.photo_url)} alt={post.title} className="h-full w-full object-cover" />
           <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-ink/60 to-transparent" />
           <button data-testid="detail-back-btn" onClick={() => navigate("/feed")} className="press absolute left-4 top-4 rounded-full bg-white/95 p-2.5 text-ink">
@@ -77,14 +79,22 @@ export default function PostDetail() {
           <div className="absolute right-4 top-4"><Countdown target={post.window_end} testId="detail-countdown" /></div>
         </div>
 
-        <div className="-mt-6 rounded-t-[2rem] bg-sand px-5 pt-6">
-          <span className="rounded-full bg-forest px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-white">
-            {post.category === "cooked" ? "Makanan matang" : "Bahan mentah"}
-          </span>
-          <h1 data-testid="detail-title" className="mt-3 font-heading text-2xl font-black leading-tight tracking-tight text-ink">{post.title}</h1>
+        <div className="-mt-6 rounded-t-[2rem] bg-sand px-5 pt-6 md:px-8">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-forest px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-white">
+              {post.category === "cooked" ? "Makanan matang" : "Bahan mentah"}
+            </span>
+            {post.auto_accept && (
+              <span data-testid="auto-accept-badge" className="rounded-full bg-leaf/20 px-3 py-1 text-[10px] font-extrabold uppercase tracking-widest text-forest">
+                Terima otomatis
+              </span>
+            )}
+          </div>
+          <h1 data-testid="detail-title" className="mt-3 font-heading text-2xl font-black leading-tight tracking-tight text-ink md:text-3xl">{post.title}</h1>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
             <Info icon={Package} label="Jumlah" value={`${post.portions} ${post.unit}`} />
+            <Info icon={Scales} label="Perkiraan berat" value={`${post.weight_kg ?? "—"} kg${post.weight_estimated ? " (estimasi)" : ""}`} />
             <Info icon={MapPin} label="Jarak" value={post.distance_m == null ? "—" : post.distance_m < 1000 ? `${post.distance_m} m` : `${(post.distance_m / 1000).toFixed(1)} km`} />
             <Info icon={Clock} label="Jendela ambil" value={`${fmt(post.window_start)} – ${fmt(post.window_end)}`} />
             <Info icon={H.icon} label="Serah terima" value={post.dropoff_name || H.label} />
@@ -137,7 +147,7 @@ export default function PostDetail() {
           )}
         </div>
 
-        <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 border-t border-line bg-white p-4 shadow-[0_-8px_30px_rgba(44,85,69,0.10)]">
+        <div className="fixed bottom-0 left-1/2 w-full max-w-md -translate-x-1/2 border-t border-line bg-white p-4 shadow-[0_-8px_30px_rgba(44,85,69,0.10)] md:static md:left-auto md:mt-6 md:w-auto md:max-w-none md:translate-x-0 md:rounded-3xl md:border md:px-8 md:shadow-warm">
           {mine ? (
             <p data-testid="own-post-note" className="text-center text-sm font-semibold text-slate2">Ini postmu. Lihat klaim masuk di Inbox.</p>
           ) : iClaimed ? (

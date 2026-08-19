@@ -40,7 +40,7 @@ export default function Admin() {
 
   return (
     <div className="min-h-screen w-full bg-[#EDE7E0]">
-      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand pb-12 shadow-2xl" data-testid="admin-page">
+      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand pb-12 shadow-2xl md:my-8 md:min-h-0 md:max-w-4xl md:overflow-hidden md:rounded-[2rem]" data-testid="admin-page">
         <div className="bg-ink px-5 pb-6 pt-8 text-white">
           <button data-testid="admin-back-btn" onClick={() => navigate("/feed")} className="press flex items-center gap-1 text-sm font-bold text-white/70">
             <ArrowLeft size={16} weight="bold" /> Feed

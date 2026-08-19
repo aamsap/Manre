@@ -1,5 +1,7 @@
 import os
 import uuid
+import json
+import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -152,3 +154,33 @@ async def notify(user_id: str, kind: str, title: str, body: str, link: str = Non
         "read": False,
         "created_at": iso(now_utc()),
     })
+    await push_to_user(user_id, title, body, link or "/inbox", kind)
+
+
+VAPID_SUBJECT = os.environ["VAPID_SUBJECT"]
+VAPID_PUBLIC_KEY = os.environ["VAPID_PUBLIC_KEY"]
+VAPID_PRIVATE_KEY = os.environ["VAPID_PRIVATE_KEY"].replace("\\n", "\n")
+
+
+def _send_one(subscription: dict, payload: str):
+    from pywebpush import webpush
+    webpush(subscription_info=subscription, data=payload,
+            vapid_private_key=VAPID_PRIVATE_KEY, vapid_claims={"sub": VAPID_SUBJECT},
+            ttl=3600, content_encoding="aes128gcm")
+
+
+async def push_to_user(user_id: str, title: str, body: str, url: str, tag: str):
+    from pywebpush import WebPushException
+    payload = json.dumps({"title": title, "body": body, "url": url, "tag": tag})
+    subs = await db.push_subscriptions.find({"user_id": user_id}, {"_id": 0}).to_list(50)
+    for row in subs:
+        info = {"endpoint": row["endpoint"], "keys": row["keys"]}
+        try:
+            await asyncio.to_thread(_send_one, info, payload)
+        except WebPushException as exc:
+            status = getattr(exc.response, "status_code", None)
+            if status in (404, 410):
+                await db.push_subscriptions.delete_one({"user_id": user_id, "endpoint": row["endpoint"]})
+        except Exception as e:
+            logger.warning(f"push failed: {type(e).__name__}")
+

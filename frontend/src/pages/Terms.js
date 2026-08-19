@@ -18,7 +18,7 @@ export default function Terms() {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen w-full bg-[#EDE7E0]">
-      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand px-5 pb-12 pt-8 shadow-2xl" data-testid="terms-page">
+      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand px-5 pb-12 pt-8 shadow-2xl md:my-10 md:min-h-0 md:max-w-3xl md:rounded-[2rem] md:px-10" data-testid="terms-page">
         <button data-testid="terms-back-btn" onClick={() => navigate(-1)} className="press flex items-center gap-1 text-sm font-bold text-slate2">
           <ArrowLeft size={16} weight="bold" /> Kembali
         </button>

@@ -88,12 +88,12 @@ export default function Onboarding() {
       canNext: true,
     },
     {
-      title: "Verifikasi zona pilot",
+      title: "Bagikan lokasimu",
       body: (
         <div className="space-y-4">
           <p className="text-sm text-slate2">
-            Manre v1 cuma jalan di koridor UB / Brawijaya, Malang (radius 3 km). Kita perlu titik
-            lokasimu sekali saja buat ngitung jarak dan urutan feed.
+            Manre bisa dipakai di mana pun. Kita cuma perlu titik lokasimu sekali saja buat
+            ngitung jarak dan mengurutkan feed dari yang paling dekat.
           </p>
           <button
             data-testid="detect-location-btn" onClick={() => detectLocation(false)} disabled={busy}
@@ -128,7 +128,7 @@ export default function Onboarding() {
 
   return (
     <div className="min-h-screen w-full bg-[#EDE7E0]">
-      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand px-6 pb-10 pt-10 shadow-2xl" data-testid="onboarding-page">
+      <div className="relative mx-auto min-h-screen w-full max-w-md bg-sand px-6 pb-10 pt-10 shadow-2xl md:my-10 md:min-h-0 md:max-w-xl md:rounded-[2rem] md:px-10" data-testid="onboarding-page">
         <div className="mb-6 flex gap-1.5">
           {steps.map((_, i) => (
             <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-clay" : "bg-line"}`} />

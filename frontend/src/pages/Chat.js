@@ -80,7 +80,7 @@ export default function Chat() {
 
   return (
     <div className="min-h-screen w-full bg-[#EDE7E0]">
-      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-sand shadow-2xl" data-testid="chat-page">
+      <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-sand shadow-2xl md:my-8 md:max-h-[88vh] md:min-h-0 md:max-w-2xl md:overflow-hidden md:rounded-[2rem]" data-testid="chat-page">
         <div className="sticky top-0 z-20 border-b border-line bg-white px-4 py-3">
           <div className="flex items-center gap-3">
             <button data-testid="chat-back-btn" onClick={() => navigate("/inbox")} className="press text-ink"><ArrowLeft size={20} weight="bold" /></button>

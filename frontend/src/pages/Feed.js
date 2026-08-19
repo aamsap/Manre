@@ -1,22 +1,22 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { SlidersHorizontal, Bell, ShieldCheck } from "@phosphor-icons/react";
+import { SlidersHorizontal, Bell, ShieldCheck, Crosshair } from "@phosphor-icons/react";
 import { Shell } from "@/components/layout/Shell";
 import { SurplusCard } from "@/components/feed/SurplusCard";
 import { api, errMsg } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 const cats = [{ k: "", t: "Semua" }, { k: "cooked", t: "Matang" }, { k: "raw", t: "Bahan" }];
-const radii = [{ v: 0.5, t: "0.5 km" }, { v: 1, t: "1 km" }, { v: 3, t: "3 km" }];
+const radii = [{ v: 0.5, t: "0.5 km" }, { v: 1, t: "1 km" }, { v: 3, t: "3 km" }, { v: 0, t: "Semua" }];
 const handoffs = [{ k: "", t: "Semua cara" }, { k: "pickup", t: "Ambil sendiri" }, { k: "dropoff", t: "Titik netral" }, { k: "delivery", t: "Diantar" }];
 
 export default function Feed() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilter, setShowFilter] = useState(false);
-  const [f, setF] = useState({ category: "", radius_km: 3, handoff: "" });
   const [coords, setCoords] = useState(null);
+  const [f, setF] = useState({ category: "", radius_km: 0, handoff: "" });
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -45,30 +45,50 @@ export default function Feed() {
 
   useEffect(() => { load(); }, [load]);
 
+  const useMyLocation = () => {
+    if (!navigator.geolocation) return toast.error("Browser tidak mendukung lokasi");
+    navigator.geolocation.getCurrentPosition(
+      async (p) => {
+        const c = { lat: p.coords.latitude, lng: p.coords.longitude };
+        setCoords(c);
+        try { await api.post("/me/location", c); } catch { /* noop */ }
+        toast.success("Feed diurutkan dari lokasimu");
+      },
+      () => toast.error("Izin lokasi ditolak")
+    );
+  };
+
   return (
-    <Shell testId="feed-page">
-      <div className="grain relative overflow-hidden rounded-b-[2rem] bg-forest px-5 pb-6 pt-8 text-white">
-        <div className="relative z-10">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-honey">Makanan di sekitarmu</p>
-              <h1 className="mt-1 font-heading text-3xl font-black leading-tight tracking-tight">
-                Hai {user?.name?.split(" ")[0]},<br />ada apa hari ini?
-              </h1>
-            </div>
-            <button data-testid="feed-inbox-btn" onClick={() => navigate("/inbox")} className="press rounded-full bg-white/15 p-2.5">
+    <Shell testId="feed-page" wide>
+      <div className="grain relative overflow-hidden rounded-b-[2rem] bg-forest px-5 pb-6 pt-8 text-white md:rounded-[2rem] md:px-8 md:pb-8">
+        <div className="relative z-10 md:flex md:items-end md:justify-between">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-honey">Makanan di sekitarmu</p>
+            <h1 className="mt-1 font-heading text-3xl font-black leading-tight tracking-tight md:text-4xl">
+              Hai {user?.name?.split(" ")[0]},<br className="md:hidden" /> ada apa hari ini?
+            </h1>
+            <p className="mt-2 hidden text-sm text-white/70 md:block">
+              Ambil yang masih layak, bagi yang berlebih. Gratis, non-komersial.
+            </p>
+          </div>
+          <div className="mt-3 flex items-center gap-2 md:mt-0">
+            <button data-testid="use-my-location-feed-btn" onClick={useMyLocation}
+              className="press flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-2 text-xs font-extrabold">
+              <Crosshair size={14} weight="bold" /> Lokasiku
+            </button>
+            <button data-testid="feed-inbox-btn" onClick={() => navigate("/inbox")} className="press rounded-full bg-white/15 p-2.5 md:hidden">
               <Bell size={20} weight="fill" />
             </button>
           </div>
-          {user?.role === "admin" && (
-            <button data-testid="admin-link" onClick={() => navigate("/admin")} className="press mt-3 flex items-center gap-1.5 rounded-full bg-honey px-3 py-1.5 text-xs font-extrabold text-ink">
-              <ShieldCheck size={14} weight="fill" /> Panel Admin
-            </button>
-          )}
         </div>
+        {user?.role === "admin" && (
+          <button data-testid="admin-link" onClick={() => navigate("/admin")} className="press relative z-10 mt-3 flex items-center gap-1.5 rounded-full bg-honey px-3 py-1.5 text-xs font-extrabold text-ink md:hidden">
+            <ShieldCheck size={14} weight="fill" /> Panel Admin
+          </button>
+        )}
       </div>
 
-      <div className="sticky top-0 z-30 -mt-3 bg-sand/95 px-5 py-3 backdrop-blur">
+      <div className="sticky top-0 z-30 -mt-3 bg-sand/95 px-5 py-3 backdrop-blur md:static md:mt-6 md:bg-transparent md:px-0">
         <div className="flex items-center gap-2">
           <div className="no-scrollbar flex flex-1 gap-2 overflow-x-auto">
             {cats.map((c) => (
@@ -84,8 +104,8 @@ export default function Feed() {
         </div>
 
         {showFilter && (
-          <div data-testid="filter-panel" className="mt-3 space-y-3 rounded-3xl border border-line bg-white p-4 shadow-warm">
-            <div>
+          <div data-testid="filter-panel" className="mt-3 space-y-3 rounded-3xl border border-line bg-white p-4 shadow-warm md:flex md:gap-8 md:space-y-0">
+            <div className="md:flex-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate2">Radius</p>
               <div className="mt-2 flex gap-2">
                 {radii.map((r) => (
@@ -93,8 +113,11 @@ export default function Feed() {
                     className={`press flex-1 rounded-full py-2 text-xs font-extrabold ${f.radius_km === r.v ? "bg-clay text-white" : "bg-sand text-slate2"}`}>{r.t}</button>
                 ))}
               </div>
+              {!coords && f.radius_km > 0 && (
+                <p className="mt-2 text-[11px] font-semibold text-clay">Aktifkan "Lokasiku" dulu supaya radius akurat.</p>
+              )}
             </div>
-            <div>
+            <div className="md:flex-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate2">Cara serah terima</p>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 {handoffs.map((h) => (
@@ -107,12 +130,12 @@ export default function Feed() {
         )}
       </div>
 
-      <div className="space-y-4 px-5 pt-2">
-        {loading && [0, 1].map((i) => <div key={i} className="h-64 animate-pulse rounded-3xl bg-white/70" />)}
+      <div className="grid auto-rows-min items-start gap-4 px-5 pt-2 md:grid-cols-2 md:px-0 md:pt-6 xl:grid-cols-3">
+        {loading && [0, 1, 2].map((i) => <div key={i} className="h-64 animate-pulse rounded-3xl bg-white/70" />)}
         {!loading && posts.length === 0 && (
-          <div data-testid="feed-empty" className="rounded-3xl border border-dashed border-line bg-white/60 p-8 text-center">
-            <p className="font-heading text-lg font-extrabold text-ink">Belum ada yang bagi</p>
-            <p className="mt-1 text-sm text-slate2">Coba perluas radius, atau kamu yang mulai bagi duluan.</p>
+          <div data-testid="feed-empty" className="rounded-3xl border border-dashed border-line bg-white/60 p-8 text-center md:col-span-2 xl:col-span-3">
+            <p className="font-heading text-lg font-extrabold text-ink">Belum ada yang bagi di sekitarmu</p>
+            <p className="mt-1 text-sm text-slate2">Coba perluas radius ke "Semua", atau kamu yang mulai bagi duluan.</p>
             <button data-testid="empty-post-btn" onClick={() => navigate("/post")} className="press mt-4 rounded-full bg-clay px-5 py-2.5 text-sm font-extrabold text-white">Bagi makanan</button>
           </div>
         )}
