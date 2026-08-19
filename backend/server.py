@@ -19,7 +19,7 @@ from core import (db, hash_password, verify_password, create_jwt, get_current_us
 app = FastAPI(title="Manre API")
 api = APIRouter(prefix="/api")
 
-MAX_RADIUS_KM = 1.0
+MAX_RADIUS_KM = 3.0
 COOKED_MAX_H = 6
 RAW_MAX_H = 48
 CLAIM_LOCK_MIN = 15
@@ -34,6 +34,11 @@ def haversine_m(lat1, lng1, lat2, lng2):
     dl = math.radians(lng2 - lng1)
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * R * math.asin(math.sqrt(a))
+
+
+def in_pilot_zone(lat, lng):
+    return haversine_m(lat, lng, PILOT_CENTER["lat"], PILOT_CENTER["lng"]) <= PILOT_RADIUS_M
+
 
 
 def offset_point(lat, lng, meters=100):
@@ -136,7 +141,7 @@ async def register(payload: RegisterIn):
         "password_hash": hash_password(payload.password), "picture": None,
         "auth_provider": "password", "role": "user", "trust_score": 50,
         "thumbs_up": 0, "thumbs_down": 0, "handoffs": 0, "posts_count": 0,
-        "no_shows": [], "is_banned": False, "location": None, "location_set": False,
+        "no_shows": [], "is_banned": False, "location": None, "zone_verified": False,
         "onboarded": False, "created_at": iso(now_utc()),
     })
     user = await db.users.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0})
@@ -176,7 +181,7 @@ async def google_session(request: Request, response: Response):
             "user_id": uid, "email": email, "name": data.get("name") or email.split("@")[0],
             "picture": data.get("picture"), "auth_provider": "google", "role": "user",
             "trust_score": 50, "thumbs_up": 0, "thumbs_down": 0, "handoffs": 0, "posts_count": 0,
-            "no_shows": [], "is_banned": False, "location": None, "location_set": False,
+            "no_shows": [], "is_banned": False, "location": None, "zone_verified": False,
             "onboarded": False, "created_at": iso(now_utc()),
         })
     token = data["session_token"]
@@ -206,11 +211,13 @@ async def logout(request: Request, response: Response):
 
 @api.post("/me/location")
 async def set_location(payload: LocationIn, user: dict = Depends(get_current_user)):
+    inside = in_pilot_zone(payload.lat, payload.lng)
     await db.users.update_one({"user_id": user["user_id"]}, {"$set": {
         "location": {"type": "Point", "coordinates": [payload.lng, payload.lat]},
-        "location_set": True,
+        "zone_verified": inside,
     }})
-    return {"location_set": True, "lat": payload.lat, "lng": payload.lng}
+    dist = haversine_m(payload.lat, payload.lng, PILOT_CENTER["lat"], PILOT_CENTER["lng"])
+    return {"zone_verified": inside, "distance_m": round(dist)}
 
 
 @api.post("/me/onboarded")
@@ -266,6 +273,8 @@ async def create_post(payload: PostIn, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Kategori tidak valid")
     if payload.handoff not in ("pickup", "dropoff", "delivery"):
         raise HTTPException(status_code=400, detail="Mode serah terima tidak valid")
+    if not in_pilot_zone(payload.lat, payload.lng):
+        raise HTTPException(status_code=400, detail="Lokasi di luar zona pilot (UB Malang, radius 3 km)")
     start, end = parse_dt(payload.window_start), parse_dt(payload.window_end)
     if end <= start:
         raise HTTPException(status_code=400, detail="Jam akhir harus setelah jam mulai")
@@ -308,7 +317,9 @@ async def enrich_post(p: dict, viewer: dict = None, origin=None):
     if origin is None and viewer and viewer.get("location"):
         vc = viewer["location"]["coordinates"]
         origin = (vc[1], vc[0])
-    out["distance_m"] = round(haversine_m(origin[0], origin[1], coords[1], coords[0])) if origin else None
+    if origin is None:
+        origin = (PILOT_CENTER["lat"], PILOT_CENTER["lng"])
+    out["distance_m"] = round(haversine_m(origin[0], origin[1], coords[1], coords[0]))
     return out
 
 
@@ -334,12 +345,12 @@ async def list_posts(category: Optional[str] = None, radius_km: Optional[float] 
     out = []
     for d in docs:
         e = await enrich_post(d, user, origin)
-        if not mine and radius_km and e["distance_m"] is not None and e["distance_m"] > radius_km * 1000:
+        if not mine and e["distance_m"] > radius_km * 1000:
             continue
         out.append(e)
     if mine:
         return out
-    out.sort(key=lambda x: (parse_dt(x["window_end"]), x["distance_m"] if x["distance_m"] is not None else 1e12))
+    out.sort(key=lambda x: (parse_dt(x["window_end"]), x["distance_m"]))
     return out
 
 
@@ -657,7 +668,8 @@ async def impact():
     agg = await db.users.aggregate([{"$group": {"_id": None, "t": {"$sum": "$portions_shared"}}}]).to_list(1)
     portions = (agg[0]["t"] if agg else 0) or 0
     return {"portions_saved": portions, "target_portions": 1000, "handoffs": completed,
-            "posts": posts, "members": users}
+            "posts": posts, "members": users,
+            "zone": {"name": "UB / Brawijaya, Malang", **PILOT_CENTER, "radius_m": PILOT_RADIUS_M}}
 
 
 # ---------- admin ----------
@@ -701,7 +713,9 @@ async def admin_users(_: dict = Depends(get_admin_user)):
 
 
 @api.post("/admin/users/{user_id}/ban")
-async def admin_ban(user_id: str, ban: bool = Query(True), _: dict = Depends(get_admin_user)):
+async def admin_ban(user_id: str, ban: bool = Query(True), admin: dict = Depends(get_admin_user)):
+    if ban and user_id == admin["user_id"]:
+        raise HTTPException(status_code=400, detail="Tidak bisa memblokir akun sendiri")
     await db.users.update_one({"user_id": user_id}, {"$set": {"is_banned": ban}})
     if ban:
         await db.posts.update_many({"donor_id": user_id, "status": "available"},
@@ -751,7 +765,7 @@ async def ensure_user(email, name, password, role="user", offset=(0.0, 0.0)):
         "posts_count": 5, "portions_shared": 0, "no_shows": [], "is_banned": False,
         "location": {"type": "Point", "coordinates": [PILOT_CENTER["lng"] + offset[1],
                                                       PILOT_CENTER["lat"] + offset[0]]},
-        "location_set": True, "onboarded": True, "created_at": iso(now_utc()),
+        "zone_verified": True, "onboarded": True, "created_at": iso(now_utc()),
     }
     await db.users.insert_one(doc)
     doc.pop("_id", None)
@@ -771,7 +785,7 @@ async def seed():
         n = now_utc()
         seeds = [
             (budi, "cooked", "Nasi campur sisa katering 6 porsi", 6, SEED_PHOTOS["cooked1"], "pickup", 5,
-             "Masih anget, dimasak 1 jam lalu. Bawa wadah sendiri ya.", (0.004, 0.003)),
+             "Masih anget, dimasak 1 jam lalu. Bawa wadah sendiri ya.", (0.0015, 0.001)),
             (sari, "cooked", "Ayam goreng + sambal 4 porsi", 4, SEED_PHOTOS["cooked2"], "dropoff", 3,
              "Titip di pos ronda Jl. Veteran. Kabari kalau mau ambil.", (-0.006, 0.005)),
             (budi, "raw", "Sayur bayam & wortel segar", 3, SEED_PHOTOS["raw1"], "delivery", 30,
@@ -794,6 +808,17 @@ async def seed():
                 "review_status": "approved", "claims_count": 0, "seeded": True,
                 "created_at": iso(n),
             })
+    else:
+        n = now_utc()
+        async for p in db.posts.find({"seeded": True}, {"_id": 0, "id": 1, "category": 1}):
+            hours = 5 if p["category"] == "cooked" else 36
+            await db.posts.update_one({"id": p["id"]}, {"$set": {
+                "window_start": iso(n), "window_end": iso(n + timedelta(hours=hours)),
+                "best_before": iso(n + timedelta(hours=hours)),
+                "prep_time": iso(n - timedelta(hours=1)) if p["category"] == "cooked" else None,
+            }})
+        await db.posts.update_many({"seeded": True, "status": {"$ne": "available"}},
+                                   {"$set": {"status": "available"}})
     return {"ok": True, "admin": admin["email"]}
 
 

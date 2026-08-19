@@ -1,0 +1,36 @@
+{
+  "summary": "Backend regression 33/33 PASSING (was 27/31). All 4 previously-failing spec regressions now pass: POST /api/me/location returns {zone_verified, distance_m} with zone_verified=true inside UB 3km and false for Jakarta; POST /api/posts rejects Jakarta with 400; GET /api/stats/impact includes zone {name,lat,lng,radius_m}; GET /api/posts with radius_km=3 returns all 4 seeded posts and radius_km=0.5 returns fewer, distance_m always numeric. Frontend E2E: landing counter + T&C + get-started OK; login (rina/budi/sari/admin) OK; feed loads with cards, category chips and radius filters work with no console errors; post detail Leaflet map renders with no 'already initialized' error; full post creation E2E (photo upload, 4 steps, dropoff+privacy_offset, responsibility_ack, publish → /post/{id}) works; full donor/recipient roundtrip works end-to-end (claim → chat/WS → donor Terima → chat reply → donor Selesai → recipient Selesai → thumbs-up rating → trust score updates); report submission from post detail shows success toast; admin panel loads, Review approves pending post, Laporan resolves a report, Warga ban button works (but see issues below); new-user onboarding role→tutorial→detect-location→zone-result→feed all work with granted geolocation.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Feed.js", "issue": "Spec requires radius 0.5/1/3 km filter chips, but code only defines radii = [0.5, 1] — filter-radius-3 does not exist and default radius is 1km, so seeded posts up to 3km can be hidden from the feed even though backend now correctly accepts radius_km=3.", "selector": "[data-testid=filter-radius-3]", "priority": "HIGH"},
+      {"component": "Onboarding.js", "issue": "Spec/req mentions a 'Pakai titik tengah kampus UB saja' fallback button — only detect-location-btn and skip-location-btn exist. Users who deny geolocation must skip without a zone check instead of using the UB center fallback.", "selector": "[data-testid=use-zone-center-btn]", "priority": "MEDIUM"},
+      {"component": "Admin.js — Warga tab", "issue": "Admin can ban themself (own row not filtered/disabled). After clicking ban-{admin_id} the admin gets logged out on next request (403 'Akun kamu diblokir'). Users list also does not refresh after ban/unban so unban button doesn't appear until page reload.", "selector": "[data-testid^=ban-]", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Feed", "issues": ["Feed default radius=1km hides posts within 1–3km even though backend allows 3km. Combined with missing 3km chip, users may see empty feed."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "Add filter-radius-3 to /app/frontend/src/pages/Feed.js radii array (v:3) so recipients can widen search to the full pilot zone. Consider bumping default radius to 3km to match spec.",
+    "Add a 'Pakai titik tengah kampus UB saja' button in Onboarding step 3 that calls /api/me/location with PILOT_CENTER (or renders data-testid=use-zone-center-btn) so the spec'd flow is testable.",
+    "In Admin.js Warga tab, hide the ban button for the current admin's own row (or disable when u.role==='admin') and refresh the user list after ban/unban succeeds. Testing agent had to unban admin manually via mongo after ban-{admin_id} was clicked."
+  ],
+  "critical_code_review_comments": [
+    "Feed.js hard-codes only two radii — this is the primary UX regression relative to spec.",
+    "Admin.js does not defensively prevent self-ban; a single misclick locks the admin account and requires DB access to recover.",
+    "Onboarding provides no explicit zone-center fallback button — users with denied geolocation take the 'Nanti saja' path and never get zone_verified=true, so they'll be blocked when POST /api/posts enforces the pilot zone.",
+    "server.py enrich_post correctly falls back to PILOT_CENTER when neither viewer.location nor query lat/lng is supplied — distance_m is guaranteed numeric.",
+    "post-map / detail-map: MiniMap component correctly avoids double-initialization; no console errors seen across ~15 navigations."
+  ],
+  "updated_files": ["/app/backend/tests/backend_test.py"],
+  "success_rate": {"backend": "100% (33/33)", "frontend": "critical flows all pass; 2 UI gaps (radius=3 chip, zone-center fallback) and 1 admin safety bug (self-ban)"},
+  "test_credentials": "admin@manre.id / ManreAdmin2026! ; budi@manre.id, sari@manre.id, rina@manre.id / Password123!",
+  "seed_data_creation": "Tests create disposable users at @manre.co and posts prefixed with 'TEST'. E2E frontend created 1 published post (sari) and 1 pending flagged post (new user), both approved. NOTE: during Warga-tab testing the admin user was accidentally banned by clicking ban-{admin_id}; I ran a one-off mongo update to reset admin.is_banned=false so subsequent runs can login.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend is fully green — do not modify server.py. Only frontend changes are required: (1) add filter-radius-3 chip in Feed.js, (2) add use-zone-center-btn in Onboarding.js step 3 that POSTs {lat:-7.9526,lng:112.6142} to /api/me/location, (3) guard Admin.js Warga tab so admins cannot self-ban and the list refreshes after ban/unban. All backend regressions in /app/backend/tests/backend_test.py should stay green.",
+  "rca of the issue": "Root causes: (a) Feed radii array missing 3km entry — cosmetic omission during initial UI build. (b) Onboarding missing the 'use zone center' shortcut button — spec required an explicit fallback distinct from 'Nanti saja'. (c) Admin.js renders a ban button for every user row including admins; combined with no self-ban guard and no list refresh, the admin lockout can happen on a single click. Reproduction of self-ban: login admin → /admin → tab Warga → click the last ban button (oldest user = admin themselves) → next protected request returns 403 with 'Akun kamu diblokir' and admin session breaks. Mitigation: filter u.role!=='admin' when rendering ban-{id} rows and reload /admin/users after mutations."
+}

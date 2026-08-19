@@ -21,16 +21,17 @@ export default function Onboarding() {
     setBusy(true);
     const send = async (lat, lng) => {
       try {
-        await api.post("/me/location", { lat, lng });
-        setLocated({ lat, lng });
-        toast.success("Lokasi tersimpan!");
+        const { data } = await api.post("/me/location", { lat, lng });
+        setLocated({ lat, lng, zone_verified: data.zone_verified, distance_m: data.distance_m });
+        if (data.zone_verified) toast.success("Kamu di dalam zona pilot!");
+        else toast.warning(`Kamu ${(data.distance_m / 1000).toFixed(1)} km dari pusat zona. Feed mungkin kosong.`);
       } catch (e) { toast.error(errMsg(e)); }
       setBusy(false);
     };
     if (fallback || !navigator.geolocation) return send(ZONE.lat, ZONE.lng);
     navigator.geolocation.getCurrentPosition(
       (p) => send(p.coords.latitude, p.coords.longitude),
-      () => { toast.info("Izin lokasi ditolak — bisa diatur nanti saat posting."); setBusy(false); setDone(true); },
+      () => { toast.info("Izin lokasi ditolak — pakai titik tengah kampus UB."); send(ZONE.lat, ZONE.lng); },
       { timeout: 8000 }
     );
   };
@@ -87,12 +88,12 @@ export default function Onboarding() {
       canNext: true,
     },
     {
-      title: "Lokasimu",
+      title: "Verifikasi zona pilot",
       body: (
         <div className="space-y-4">
           <p className="text-sm text-slate2">
-            Manre pakai lokasi buat nunjukin makanan terdekat dan ngitung jarak. Kamu bisa deteksi
-            sekarang, atau nanti saat mau bagi makanan — pin lokasi bisa digeser kok.
+            Manre v1 cuma jalan di koridor UB / Brawijaya, Malang (radius 3 km). Kita perlu titik
+            lokasimu sekali saja buat ngitung jarak dan urutan feed.
           </p>
           <button
             data-testid="detect-location-btn" onClick={() => detectLocation(false)} disabled={busy}
@@ -100,12 +101,17 @@ export default function Onboarding() {
           >
             <Crosshair size={18} weight="bold" /> {busy ? "Mendeteksi..." : "Deteksi lokasiku"}
           </button>
+          <button data-testid="use-zone-center-btn" onClick={() => detectLocation(true)} disabled={busy}
+            className="w-full text-xs font-semibold text-slate2 underline">
+            Pakai titik tengah kampus UB saja
+          </button>
           <button data-testid="skip-location-btn" onClick={() => setDone(true)} className="w-full text-xs font-semibold text-slate2 underline">
             Nanti saja
           </button>
           {located !== null && (
-            <div data-testid="zone-result" className="flex items-center gap-2 rounded-2xl bg-leaf/15 p-3 text-sm font-semibold text-forest">
-              <CheckCircle size={18} weight="fill" /> Lokasi tersimpan — feed sudah diurutkan dari yang terdekat
+            <div data-testid="zone-result" className={`flex items-center gap-2 rounded-2xl p-3 text-sm font-semibold ${located.zone_verified ? "bg-leaf/15 text-forest" : "bg-honey/25 text-ink"}`}>
+              <CheckCircle size={18} weight="fill" />
+              {located.zone_verified ? "Lokasi terverifikasi di zona pilot" : "Di luar zona — kamu masih bisa lihat feed"}
             </div>
           )}
           <p className="rounded-2xl bg-white p-3 text-xs leading-relaxed text-slate2">

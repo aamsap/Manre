@@ -108,13 +108,17 @@ class TestLocation:
     def test_zone_inside(self, rina_token):
         r = requests.post(f"{API}/me/location", json={"lat": UB_LAT, "lng": UB_LNG}, headers=hdr(rina_token))
         assert r.status_code == 200
-        assert r.json()["location_set"] is True
+        d = r.json()
+        assert d["zone_verified"] is True
+        assert isinstance(d["distance_m"], int)
+        assert d["distance_m"] < 500
 
     def test_zone_outside(self, rina_token):
-        # v1.1: no pilot-zone gate — any coordinates are accepted
         r = requests.post(f"{API}/me/location", json={"lat": -6.2, "lng": 106.8}, headers=hdr(rina_token))
         assert r.status_code == 200
-        assert r.json()["location_set"] is True
+        d = r.json()
+        assert d["zone_verified"] is False
+        assert d["distance_m"] > 500000  # ~800km
         # reset back
         requests.post(f"{API}/me/location", json={"lat": UB_LAT, "lng": UB_LNG}, headers=hdr(rina_token))
 
@@ -140,9 +144,8 @@ class TestPostValidation:
         assert r.status_code == 400
 
     def test_reject_outside_zone(self, sari_token):
-        # v1.1: zone gate removed — posting from anywhere must succeed
         r = requests.post(f"{API}/posts", json=_base_post(lat=-6.2, lng=106.8), headers=hdr(sari_token))
-        assert r.status_code == 200
+        assert r.status_code == 400
 
     def test_reject_cooked_window_too_long(self, sari_token):
         n = datetime.now(timezone.utc)
@@ -495,3 +498,20 @@ class TestReportsImpact:
         assert "portions_saved" in d
         assert "target_portions" in d
         assert "members" in d
+        assert "zone" in d and d["zone"]["name"] and d["zone"]["radius_m"] == 3000
+        assert d["zone"]["lat"] and d["zone"]["lng"]
+
+    def test_feed_radius_3km_returns_all_seeded(self, rina_token):
+        # radius 3km should return all 4 seeded posts (they're within 1km of PILOT_CENTER)
+        r = requests.get(f"{API}/posts?radius_km=3", headers=hdr(rina_token))
+        assert r.status_code == 200
+        posts = r.json()
+        seeded = [p for p in posts if p.get("donor", {}).get("name") in ("Budi Warung", "Sari Catering")]
+        assert len(seeded) >= 4, f"expected >=4 seeded posts, got {len(seeded)}"
+        for p in posts:
+            assert isinstance(p["distance_m"], (int, float)), f"distance_m must be numeric: {p['distance_m']}"
+
+    def test_feed_radius_smaller_returns_fewer(self, rina_token):
+        r3 = requests.get(f"{API}/posts?radius_km=3", headers=hdr(rina_token)).json()
+        r05 = requests.get(f"{API}/posts?radius_km=0.5", headers=hdr(rina_token)).json()
+        assert len(r05) <= len(r3)

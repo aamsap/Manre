@@ -8,14 +8,14 @@ import { api, errMsg } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 const cats = [{ k: "", t: "Semua" }, { k: "cooked", t: "Matang" }, { k: "raw", t: "Bahan" }];
-const radii = [{ v: 0.5, t: "0.5 km" }, { v: 1, t: "1 km" }];
+const radii = [{ v: 0.5, t: "0.5 km" }, { v: 1, t: "1 km" }, { v: 3, t: "3 km" }];
 const handoffs = [{ k: "", t: "Semua cara" }, { k: "pickup", t: "Ambil sendiri" }, { k: "dropoff", t: "Titik netral" }, { k: "delivery", t: "Diantar" }];
 
 export default function Feed() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showFilter, setShowFilter] = useState(false);
-  const [f, setF] = useState({ category: "", radius_km: 1, handoff: "" });
+  const [f, setF] = useState({ category: "", radius_km: 3, handoff: "" });
   const [coords, setCoords] = useState(null);
   const { user } = useAuth();
   const navigate = useNavigate();

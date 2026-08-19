@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ArrowLeft, CheckCircle, XCircle, Prohibit, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { api, errMsg, mediaUrl } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Admin() {
   const [tab, setTab] = useState("review");
@@ -10,6 +11,7 @@ export default function Admin() {
   const [flagged, setFlagged] = useState([]);
   const [reports, setReports] = useState([]);
   const [users, setUsers] = useState([]);
+  const { user: me } = useAuth();
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
@@ -111,9 +113,11 @@ export default function Admin() {
                 <p className="truncate font-heading text-sm font-extrabold text-ink">{u.name} {u.role === "admin" && "· admin"}</p>
                 <p className="truncate text-xs text-slate2">{u.email} · trust {u.trust_score}</p>
               </div>
-              {u.is_banned
-                ? <button data-testid={`unban-${u.user_id}`} onClick={() => ban(u.user_id, false)} className="press rounded-full bg-forest p-2.5 text-white"><ArrowCounterClockwise size={16} weight="bold" /></button>
-                : <button data-testid={`ban-${u.user_id}`} onClick={() => ban(u.user_id, true)} className="press rounded-full bg-clay p-2.5 text-white"><Prohibit size={16} weight="bold" /></button>}
+              {u.user_id === me?.user_id
+                ? <span data-testid={`self-row-${u.user_id}`} className="rounded-full bg-sand px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-slate2">Kamu</span>
+                : u.is_banned
+                  ? <button data-testid={`unban-${u.user_id}`} onClick={() => ban(u.user_id, false)} className="press rounded-full bg-forest p-2.5 text-white"><ArrowCounterClockwise size={16} weight="bold" /></button>
+                  : <button data-testid={`ban-${u.user_id}`} onClick={() => ban(u.user_id, true)} className="press rounded-full bg-clay p-2.5 text-white"><Prohibit size={16} weight="bold" /></button>}
             </div>
           ))}
         </div>
