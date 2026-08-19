@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Figtree:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    font-family: 'Figtree', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #EDE7E0;
+}
+
+h1, h2, h3, h4, .font-heading { font-family: 'Manrope', system-ui, sans-serif; }
+
+@layer base {
+    :root {
+        --background: 36 27% 95%;
+        --foreground: 150 10% 12%;
+        --card: 0 0% 100%;
+        --card-foreground: 150 10% 12%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 150 10% 12%;
+        --primary: 11 69% 60%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 158 32% 25%;
+        --secondary-foreground: 0 0% 100%;
+        --muted: 36 24% 92%;
+        --muted-foreground: 150 5% 38%;
+        --accent: 28 86% 67%;
+        --accent-foreground: 150 10% 12%;
+        --destructive: 0 72% 51%;
+        --destructive-foreground: 0 0% 100%;
+        --border: 36 27% 88%;
+        --input: 36 27% 88%;
+        --ring: 11 69% 60%;
+        --radius: 1rem;
+    }
+}
+
+@layer base {
+    * { @apply border-border; }
+    body { @apply text-foreground; }
+}
+
+.grain::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.35;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    z-index: 0;
+}
+
+.press { transition: transform 120ms ease, background-color 160ms ease, box-shadow 160ms ease; }
+.press:active { transform: scale(0.95); }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+::selection { background: #F4A261; color: #1C221F; }
+
+.leaflet-container { border-radius: 1rem; z-index: 0; }
+
+@layer base {
+    [data-debug-wrapper="true"] { display: contents !important; }
+}

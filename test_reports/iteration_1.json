@@ -1,0 +1,44 @@
+{
+  "summary": "Backend: 27/31 pytest passing (87%). Auth (register/login/me/logout), photo upload+serve, post CRUD + validation (window duration, end>start, responsibility_ack, category), feed filters/sort/distance, flagged first-3-posts + admin approve flow, claim flow (donor cannot claim own, ack required, second claimant blocked, hoarding cap 2, donor accept/reject, recipient cancel), chat forbid third-party, full handoff+rate+double-rate reject, no-show cooldown after 2 in 30d, admin endpoints (flagged/reports/users/stats/ban+unban), public reports & impact all work. 4 real spec regressions found in backend. Frontend smoke: landing page shows target counter + get-started + T&C link; rina login lands on /feed with seeded cards + category chips; post detail renders map with no init errors, claim btn correctly disabled until recipient-ack checkbox is checked; admin login succeeds. Bottom-nav testids exist (nav-feed / nav-inbox / nav-profile / nav-post) — they simply aren't rendered on post-detail sub-page (which uses a back-arrow layout), that's expected.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/me/location", "issue": "Spec: should return {zone_verified, distance_m} and set user.zone_verified. Actual: returns {location_set, lat, lng} and stores 'location_set' instead of 'zone_verified'. Onboarding zone verification (spec: reject / mark unverified for points outside UB 3km) is not enforced.", "priority": "HIGH"},
+      {"endpoint": "POST /api/posts", "issue": "Pilot-zone check removed. Spec requires reject when lat/lng outside UB 3km, but the endpoint accepts Jakarta coordinates (-6.2/106.8) and creates the post.", "priority": "HIGH"},
+      {"endpoint": "GET /api/stats/impact", "issue": "Response is missing the 'zone' object (spec: return portions_saved, target_portions and zone {name,lat,lng,radius_m}). Landing page/T&C rely on it.", "priority": "MEDIUM"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/posts", "issue": "distance_m can be null when caller does not pass lat/lng (viewer.location no longer has coordinates because /me/location no longer sets zone-aware geoJSON updates on seeded users' behalf). Not fatal but the spec assumed distance was always computed against viewer or pilot center."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Restore pilot-zone validation on POST /api/me/location — compute in_pilot_zone(lat,lng), persist user.zone_verified, and return {zone_verified, distance_m} as the frontend Onboarding + spec expect.",
+    "Restore in_pilot_zone(lat,lng) guard at the top of POST /api/posts so posts outside UB 3 km are rejected with 400.",
+    "Add 'zone': {name, lat, lng, radius_m} back to GET /api/stats/impact response.",
+    "Optional: make GET /api/posts fall back to PILOT_CENTER when neither viewer.location nor query lat/lng is supplied, so distance_m is never null (older enrich_post did this)."
+  ],
+  "critical_code_review_comments": [
+    "server.py set_location was silently rewritten and now stores 'location_set' instead of 'zone_verified'; this breaks the Onboarding UX guardrail described in the spec.",
+    "POST /api/posts no longer validates pilot zone — this is the main abuse guardrail for the hyperlocal pilot and must be restored.",
+    "enrich_post now returns distance_m=None when no origin is provided; callers (feed) rely on distance for sorting — sort key already guards with 1e12 but UI cards may show empty distance for users without a set location.",
+    "notify() stores field 'kind' but some UI/spec docs reference 'type' — pick one and align (frontend Inbox reads 'kind', so keep 'kind' and update docs)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "87% (27/31)", "frontend": "smoke-passed on critical flows"},
+  "test_credentials": "admin@manre.id / ManreAdmin2026! ; budi@manre.id, sari@manre.id, rina@manre.id / Password123!",
+  "seed_data_creation": "Tests create disposable users with @manre.co (rec_*, hoard_*, flow_*, noshow_*, ban_*, newu_*) and posts prefixed with 'TEST '. All flow tests self-clean where reasonable (cancel claim, unban).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend regression tests live at /app/backend/tests/backend_test.py, run in parallel with xdist. Remaining 4 failures encode real spec-vs-code regressions and should stay failing until backend is fixed. Frontend smoke was manual/light — a fuller end-to-end (post creation w/ image upload, full donor/recipient chat, report submission, admin approve+ban) still needs to run after backend fixes.",
+  "rca of the issue": "server.py was refactored (likely to accommodate a client-side geolocation UX) and dropped the pilot-zone guards in three places: /me/location no longer computes/persists zone_verified, /posts no longer calls in_pilot_zone(), and /stats/impact no longer emits the zone descriptor. Reproduction: (1) login rina; (2) POST /api/me/location {lat:-6.2,lng:106.8} → 200 with {location_set:true,...} (no zone_verified, and user is not flagged); (3) POST /api/posts with same Jakarta lat/lng → 200. Mitigation: reintroduce the three checks/fields exactly as documented in the review request; the helpers in_pilot_zone() and haversine_m() still exist and are correct."
+}

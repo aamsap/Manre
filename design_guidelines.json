@@ -1,0 +1,146 @@
+{
+  "theme": "light",
+  "mood": "Warm, earthy, community-driven, trustworthy, urgent but not corporate.",
+  "typography": {
+    "font_families": {
+      "heading": "Manrope",
+      "body": "Figtree"
+    },
+    "scale": {
+      "h1": "text-3xl sm:text-4xl tracking-tight font-black",
+      "h2": "text-2xl sm:text-3xl tracking-tight font-extrabold",
+      "h3": "text-xl sm:text-2xl font-bold",
+      "body": "text-base leading-relaxed font-medium",
+      "small": "text-sm font-medium",
+      "label": "text-xs tracking-[0.05em] uppercase font-bold"
+    },
+    "rules": [
+      "Use tight letter spacing for headings.",
+      "Never use Inter or generic sans for headings.",
+      "Labels must be uppercase with wide tracking."
+    ]
+  },
+  "colors": {
+    "palette": {
+      "base": "#F7F4F0",
+      "surface": "#FFFFFF",
+      "primary": "#E06D53",
+      "primary_hover": "#C8583F",
+      "secondary": "#2C5545",
+      "secondary_hover": "#1F3F32",
+      "accent": "#F4A261",
+      "text_primary": "#1C221F",
+      "text_secondary": "#5C6460",
+      "border": "#E8E2D9",
+      "warning": "#E76F51",
+      "success": "#5B8266"
+    },
+    "rules": [
+      "Warm sand background, not pure white for the app wrapper.",
+      "Terracotta orange for urgent CTAs and timers.",
+      "Deep forest green for secondary buttons and trust indicators.",
+      "Never use pure black; use deep olive (#1C221F).",
+      "Ensure minimum 4.5:1 contrast ratio for normal text."
+    ]
+  },
+  "visual_enhancers": {
+    "shadows": "Use soft, warm ambient shadows. No harsh black dropshadows. Example: shadow-[0_8px_30px_rgba(44,85,69,0.08)]",
+    "borders": "Soft borders, 1px solid border with #E8E2D9 for cards.",
+    "radii": "rounded-2xl or rounded-3xl for cards. Nested elements should have proportionate radii.",
+    "textures": "Subtle paper or grain texture for backgrounds to enhance the 'earthy' feel."
+  },
+  "components": {
+    "instructions": [
+      "Use Shadcn primitives but heavily style them.",
+      "Bottom Navigation: Fixed bottom, solid background (NO TRANSPARENCY), soft top shadow, icons for Feed, Post, Inbox, Profile.",
+      "Floating Action Button (FAB): Use a prominent, pill-shaped primary color button slightly hovering above the bottom nav for the 'Post' action.",
+      "Feed Cards (Bento Style): Full width on mobile, large image on top (max-h-48, object-cover). Timer overlaid on image with solid pill background. Condition notes and portions below.",
+      "Timers: Visual progress bars or pulsating pills in #E06D53 for expiring soon, #5B8266 for > 2 hours left.",
+      "Forms (Post Flow): Multi-step, card-based with clear progression.",
+      "Toasts: Use sonner."
+    ],
+    "paths": {
+      "bottom_nav": "/app/frontend/src/components/layout/BottomNav.js",
+      "feed_card": "/app/frontend/src/components/feed/SurplusCard.js",
+      "post_form": "/app/frontend/src/components/post/PostForm.js",
+      "claim_modal": "/app/frontend/src/components/claim/ClaimModal.js"
+    }
+  },
+  "layouts": {
+    "mobile_first": true,
+    "container": "w-full max-w-md mx-auto min-h-screen bg-[#F7F4F0] pb-24 relative overflow-x-hidden shadow-2xl",
+    "spacing_scale": "p-4, p-6, p-8. Generous padding inside cards.",
+    "grids": "Use 1-column stack for mobile feed. 2-column bento for profile stats or filters."
+  },
+  "motion": {
+    "rules": [
+      "Card entrance: slide up with slight fade in.",
+      "Button press: scale-down (scale-95).",
+      "Page transitions: smooth horizontal slide for claims/chat.",
+      "Do NOT use 'transition: all'."
+    ]
+  },
+  "accessibility": {
+    "rules": [
+      "All interactive elements MUST have data-testid attributes.",
+      "Contrast check required for text over images. Use solid background or heavy gradient for text overlay on photos.",
+      "Focus states: ring-2 ring-primary ring-offset-2 ring-offset-[#F7F4F0]."
+    ]
+  },
+  "media": {
+    "image_urls": {
+      "cooked_food_1": {
+        "url": "https://images.unsplash.com/photo-1539755530862-00f623c00f52?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzV8MHwxfHNlYXJjaHwxfHxpbmRvbmVzaWFuJTIwY29va2VkJTIwZm9vZHxlbnwwfHx8fDE3ODcxMTI5Mjd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Variety of Indonesian cooked food on a table.",
+        "category": "feed_mock"
+      },
+      "cooked_food_2": {
+        "url": "https://images.unsplash.com/photo-1682139710677-cb02f6bc4211?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzV8MHwxfHNlYXJjaHwzfHxpbmRvbmVzaWFuJTIwY29va2VkJTIwZm9vZHxlbnwwfHx8fDE3ODcxMTI5Mjd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Wooden table with plates of food.",
+        "category": "feed_mock"
+      },
+      "raw_ingredients_1": {
+        "url": "https://images.unsplash.com/photo-1590779033100-9f60a05a013d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAxODF8MHwxfHNlYXJjaHwyfHxmcmVzaCUyMHZlZ2V0YWJsZXMlMjByYXclMjBpbmdyZWRpZW50c3xlbnwwfHx8fDE3ODcxMTI5Mjd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Assorted fresh vegetables.",
+        "category": "feed_mock"
+      },
+      "raw_ingredients_2": {
+        "url": "https://images.unsplash.com/photo-1579113800032-c38bd7635818?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAxODF8MHwxfHNlYXJjaHwxfHxmcmVzaCUyMHZlZ2V0YWJsZXMlMjByYXclMjBpbmdyZWRpZW50c3xlbnwwfHx8fDE3ODcxMTI5Mjd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Pile of fresh vegetables.",
+        "category": "feed_mock"
+      },
+      "community_sharing": {
+        "url": "https://images.unsplash.com/photo-1765582870011-ff3cfdb06700?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwyfHxwZW9wbGUlMjBzaGFyaW5nJTIwZm9vZCUyMGNvbW11bml0eXxlbnwwfHx8fDE3ODcxMTI5Mjd8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Friends gathered around a table for a meal.",
+        "category": "onboarding_hero"
+      }
+    }
+  },
+  "icons_library": "@phosphor-icons/react",
+  "instructions_to_main_agent": [
+    "Run `yarn add @phosphor-icons/react framer-motion sonner` to add necessary packages.",
+    "Implement a strict Mobile-First PWA container constraint (`max-w-md mx-auto`) so the app looks like a native mobile app even when viewed on a desktop viewport. Wrap the main layout inside a phone-like container wrapper with proper shadowing (`shadow-2xl`).",
+    "Use Manrope for all headings and Figtree for body text. Do not use generic fonts like Inter. Import these from Google Fonts.",
+    "Avoid default standard Shadcn styling. Adapt the border-radius (`rounded-2xl`, `rounded-3xl`) and colors to match the earthy/warm aesthetic.",
+    "In the Nearby Feed, prioritize visual urgency using the Terracotta (#E06D53) color for countdown timers.",
+    "DO NOT use a transparent background for the bottom navigation or any top overlays. Always use a solid color like #FFFFFF or #F7F4F0 to ensure readability.",
+    "For the map pin feature, mock the map UI with a generic map background or abstract grid with an overlaying pin since real map integration isn't strictly requested.",
+    "Ensure the application strictly uses .js file extensions instead of .tsx, since this environment runs on standard JavaScript.",
+    "Implement 'data-testid' on ALL interactive buttons, links, and forms."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur), but never pure transparency over content.",
+    "You MUST NOT apply universal transition. Eg: `transition: all`. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms.",
+    "You MUST NOT center align the app container, ie do not add `.App { text-align: center; }` in the css file. This disrupts the human natural reading flow of text.",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style.",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Prioritize using pre-existing components from src/components/ui when applicable.",
+    "Use `sonner` for toasts. Sonner components are located in `/app/frontend/src/components/ui/sonner.js`."
+  ]
+}

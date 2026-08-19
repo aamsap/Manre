@@ -1,0 +1,16 @@
+{
+  "short_name": "Manre",
+  "name": "Manre — Bagi Makanan Yuk",
+  "description": "Berbagi makanan surplus dengan tetangga di sekitar UB Malang sebelum terbuang.",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ],
+  "start_url": "/feed",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#2C5545",
+  "background_color": "#F7F4F0",
+  "lang": "id"
+}
