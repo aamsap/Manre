@@ -16,8 +16,8 @@ export const SideNav = ({ unread = 0 }) => {
   return (
     <aside data-testid="side-nav" className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-line bg-white px-5 py-8 md:flex">
       <button onClick={() => navigate("/feed")} className="press text-left">
-        <span className="font-heading text-2xl font-black tracking-tight text-forest">Manre</span>
-        <span className="mt-0.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate2">
+        <img src="/images/manre-logo-text.png" alt="Manre" className="h-7 w-auto" />
+        <span className="mt-1.5 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate2">
           Bagi makanan yuk
         </span>
       </button>

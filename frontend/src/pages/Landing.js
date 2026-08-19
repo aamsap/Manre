@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Leaf, ForkKnife, Clock, Scales, House, Storefront, Buildings } from "@phosphor-icons/react";
+import { ArrowRight, ForkKnife, Clock, Scales, House, Storefront, Buildings, Warning, Coins, CloudFog, UsersThree } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -50,38 +50,84 @@ export default function Landing() {
   );
 
   const wasteSources = [
-    { i: House, color: "bg-clay", t: "Rumah tangga", stat: "53–64%",
-      note: "Sisa makan, bahan basi & porsi kebesaran — sumber terbesar menurut Bappenas & Barilla Center for Food & Nutrition." },
-    { i: Storefront, color: "bg-honey", t: "Restoran, warung & UMKM", stat: "13–37%",
+    { i: House, color: "bg-clay", track: "bg-clay/15", t: "Rumah tangga", stat: "53–64%", bar: 100,
+      note: "Sisa makan, bahan basi & porsi kebesaran — sumber terbesar di semua studi." },
+    { i: Storefront, color: "bg-honey", track: "bg-honey/20", t: "Restoran, warung & UMKM", stat: "13–37%", bar: 55,
       note: "Sisa dapur, stok berlebih & menu tak terjual di luar rumah tangga." },
-    { i: Buildings, color: "bg-forest", t: "Program pemerintah (mis. MBG)", stat: "≈1,1–1,4 juta ton/thn",
-      note: "Menu kurang diterima & distribusi berlebih di dapur SPPG dan sekolah (WALHI/Ecoton, 2025)." },
+  ];
+
+  const impactStats = [
+    { i: Coins, t: "Rp213–551 T/tahun", note: "kerugian ekonomi, setara 4–5% PDB Indonesia" },
+    { i: CloudFog, t: "≈7,3% emisi nasional", note: "gas rumah kaca — metana dari sampah makanan yang membusuk di TPA" },
+    { i: UsersThree, t: "125 juta orang", note: "bisa terpenuhi kebutuhan makannya dari makanan yang terbuang tiap tahun" },
   ];
 
   const wasteData = (
-    <div data-testid="waste-source-section" className="rounded-3xl border border-line bg-white p-5 shadow-warm md:p-7">
-      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate2">Dari mana sampah makanan terbanyak?</p>
-      <p className="mt-2 text-sm leading-relaxed text-slate2">
-        Indonesia membuang <span className="font-extrabold text-ink">23–48 juta ton makanan</span> tiap tahun
-        (Bappenas, 2021) — kerugian ekonomi Rp213–551 triliun, setara 4–5% PDB.
-      </p>
-      <div className="mt-4 space-y-3">
-        {wasteSources.map(({ i: I, color, t, stat, note }) => (
-          <div key={t} className="flex gap-3">
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${color}`}>
-              <I size={18} weight="fill" className="text-white" />
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <p className="text-sm font-extrabold text-ink">{t}</p>
-                <p className="text-xs font-bold text-slate2">{stat}</p>
+    <div data-testid="waste-source-section" className="rounded-3xl border border-line bg-white p-5 shadow-warm md:p-8">
+      <div className="md:grid md:grid-cols-12 md:gap-x-10">
+        <div className="md:col-span-7">
+          <div className="flex items-center gap-1.5 text-clay">
+            <Warning size={14} weight="fill" />
+            <p className="text-xs font-bold uppercase tracking-[0.14em]">Kenapa Manre penting</p>
+          </div>
+          <div className="mt-2 flex items-end gap-2">
+            <span className="font-heading text-3xl font-black tabular-nums text-ink md:text-5xl">23–48</span>
+            <span className="pb-0.5 text-sm font-semibold text-slate2 md:text-base">juta ton makanan dibuang di Indonesia / tahun</span>
+          </div>
+          <p className="mt-1 text-xs text-slate2 md:text-sm">Dari mana asalnya paling banyak?</p>
+
+          <div className="mt-4 space-y-3.5">
+            {wasteSources.map(({ i: I, color, track, t, stat, bar, note }) => (
+              <div key={t}>
+                <div className="flex items-center gap-2">
+                  <I size={16} weight="fill" className={color.replace("bg-", "text-")} />
+                  <p className="text-sm font-extrabold text-ink">{t}</p>
+                  <p className="ml-auto text-xs font-extrabold text-ink">{stat}</p>
+                </div>
+                <div className={`mt-1.5 h-2 w-full overflow-hidden rounded-full ${track}`}>
+                  <motion.div
+                    className={`h-full rounded-full ${color}`}
+                    initial={{ width: 0 }} whileInView={{ width: `${bar}%` }}
+                    viewport={{ once: true }} transition={{ duration: 0.8 }}
+                  />
+                </div>
+                <p className="mt-1 text-[11px] leading-snug text-slate2">{note}</p>
               </div>
-              <p className="mt-0.5 text-xs leading-snug text-slate2">{note}</p>
+            ))}
+
+            <div className="flex gap-3 rounded-2xl border border-forest/20 bg-forest/5 p-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-forest">
+                <Buildings size={18} weight="fill" className="text-white" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <p className="text-sm font-extrabold text-ink">Program pemerintah, mis. MBG</p>
+                  <p className="text-xs font-extrabold text-forest">≈1,1–1,4 juta ton/thn</p>
+                </div>
+                <p className="mt-0.5 text-[11px] leading-snug text-slate2">
+                  Sumber baru sejak 2025 — menu kurang diterima & distribusi berlebih di dapur SPPG dan sekolah.
+                  Angka ini tonase absolut, bukan bagian dari persentase di atas.
+                </p>
+              </div>
             </div>
           </div>
-        ))}
+        </div>
+
+        <div className="mt-5 border-t border-line pt-4 md:col-span-5 md:mt-0 md:border-l md:border-t-0 md:pl-8 md:pt-0">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate2">Kenapa ini masalah</p>
+          <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3 md:grid-cols-1">
+            {impactStats.map(({ i: I, t, note }) => (
+              <div key={t} className="rounded-2xl border border-line bg-sand/60 p-3">
+                <I size={18} weight="duotone" className="text-clay" />
+                <p className="mt-1.5 text-sm font-extrabold leading-tight text-ink">{t}</p>
+                <p className="mt-0.5 text-[11px] leading-snug text-slate2">{note}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      <p className="mt-4 text-[10px] leading-relaxed text-slate2/80">
+
+      <p className="mt-5 text-[10px] leading-relaxed text-slate2/80">
         Sumber: Bappenas (2021) · Barilla Center for Food &amp; Nutrition · WALHI &amp; Ecoton (2025) · Waste4Change × World Resources Institute.
       </p>
     </div>
@@ -115,7 +161,7 @@ export default function Landing() {
           <div className="absolute inset-0 bg-gradient-to-b from-ink/40 via-ink/20 to-sand" />
           <div className="absolute inset-x-6 top-8">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[10px] font-extrabold uppercase tracking-[0.18em] text-forest">
-              <Leaf size={12} weight="fill" /> Manre
+              <img src="/images/manre-logo.png" alt="" className="h-3.5 w-3.5" /> Manre
             </span>
           </div>
           <motion.div
@@ -144,7 +190,7 @@ export default function Landing() {
       {/* tablet & desktop */}
       <div className="hidden min-h-screen md:block" data-testid="landing-page-desktop">
         <header className="mx-auto flex max-w-6xl items-center justify-between px-8 py-6">
-          <span className="font-heading text-2xl font-black tracking-tight text-forest">Manre</span>
+          <img src="/images/manre-logo-text.png" alt="Manre" className="h-8 w-auto" />
           <div className="flex items-center gap-4">
             <button onClick={() => navigate("/terms")} className="press text-sm font-bold text-slate2">Syarat & Ketentuan</button>
             <button data-testid="desktop-login-btn" onClick={() => navigate(user ? "/feed" : "/login")}
@@ -182,7 +228,7 @@ export default function Landing() {
         </div>
 
         <div className="mx-auto max-w-6xl px-8 pb-16">
-          <div className="max-w-2xl">{wasteData}</div>
+          {wasteData}
         </div>
       </div>
     </div>
