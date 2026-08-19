@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Leaf, ForkKnife, Clock, Scales } from "@phosphor-icons/react";
+import { ArrowRight, Leaf, ForkKnife, Clock, Scales, House, Storefront, Buildings } from "@phosphor-icons/react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -46,6 +46,44 @@ export default function Landing() {
           <p className="mt-1 text-[11px] font-bold leading-tight text-ink">{t}</p>
         </div>
       ))}
+    </div>
+  );
+
+  const wasteSources = [
+    { i: House, color: "bg-clay", t: "Rumah tangga", stat: "53–64%",
+      note: "Sisa makan, bahan basi & porsi kebesaran — sumber terbesar menurut Bappenas & Barilla Center for Food & Nutrition." },
+    { i: Storefront, color: "bg-honey", t: "Restoran, warung & UMKM", stat: "13–37%",
+      note: "Sisa dapur, stok berlebih & menu tak terjual di luar rumah tangga." },
+    { i: Buildings, color: "bg-forest", t: "Program pemerintah (mis. MBG)", stat: "≈1,1–1,4 juta ton/thn",
+      note: "Menu kurang diterima & distribusi berlebih di dapur SPPG dan sekolah (WALHI/Ecoton, 2025)." },
+  ];
+
+  const wasteData = (
+    <div data-testid="waste-source-section" className="rounded-3xl border border-line bg-white p-5 shadow-warm md:p-7">
+      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate2">Dari mana sampah makanan terbanyak?</p>
+      <p className="mt-2 text-sm leading-relaxed text-slate2">
+        Indonesia membuang <span className="font-extrabold text-ink">23–48 juta ton makanan</span> tiap tahun
+        (Bappenas, 2021) — kerugian ekonomi Rp213–551 triliun, setara 4–5% PDB.
+      </p>
+      <div className="mt-4 space-y-3">
+        {wasteSources.map(({ i: I, color, t, stat, note }) => (
+          <div key={t} className="flex gap-3">
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${color}`}>
+              <I size={18} weight="fill" className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <p className="text-sm font-extrabold text-ink">{t}</p>
+                <p className="text-xs font-bold text-slate2">{stat}</p>
+              </div>
+              <p className="mt-0.5 text-xs leading-snug text-slate2">{note}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="mt-4 text-[10px] leading-relaxed text-slate2/80">
+        Sumber: Bappenas (2021) · Barilla Center for Food &amp; Nutrition · WALHI &amp; Ecoton (2025) · Waste4Change × World Resources Institute.
+      </p>
     </div>
   );
 
@@ -98,6 +136,7 @@ export default function Landing() {
           </p>
           {counter}
           {pills}
+          {wasteData}
           <div>{cta}</div>
         </div>
       </div>
@@ -140,6 +179,10 @@ export default function Landing() {
             </motion.div>
             {counter}
           </div>
+        </div>
+
+        <div className="mx-auto max-w-6xl px-8 pb-16">
+          <div className="max-w-2xl">{wasteData}</div>
         </div>
       </div>
     </div>
